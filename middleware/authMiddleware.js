@@ -15,7 +15,15 @@ const authMiddleware = (req, res, next) => {
             algorithms: ["RS256"]
         });
 
-        req.user = decoded;
+        // populate req.user with fallback values
+        req.user = {
+            userId: decoded.userId,
+            nom: decoded.nom || "",
+            prenom: decoded.prenom || "",
+            email: decoded.email || "",
+            phone: decoded.phone || "",
+            cin: decoded.cin || `UNKNOWN-${Date.now()}`
+        };
 
         next();
     } catch (err) {

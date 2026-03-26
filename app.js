@@ -1,22 +1,23 @@
 const express = require('express');
-const bodyParser = require('body-parser');
+const cors = require('cors');
 const fournisseurRoutes = require('./routes/fournisseur');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
-const cors = require('cors');
-//const eurekaClient = require('./config/eureka-client');
 
 const app = express();
-app.use(bodyParser.json());
 
-// CORS pour React frontend
+// CORS
 app.use(cors({
   origin: 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Swagger
+// JSON parsing w limit kbira l images Base64
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Swagger setup
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -32,20 +33,12 @@ const options = {
 
 const swaggerSpec = swaggerJsdoc(options);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Routes
 app.use('/api', fournisseurRoutes);
 
 // Start server
 app.listen(5000, () => {
   console.log('Fournisseur microservice running on port 5000');
-
-  /* Registration with Eureka
-  eurekaClient.start(err => {
-    if (err) {
-      console.error('Eureka registration failed:', err);
-    } else {
-      console.log('Registered with Eureka');
-    }
-  });*/
 });

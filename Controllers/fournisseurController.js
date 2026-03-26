@@ -26,6 +26,181 @@ exports.getAll = async (req, res) => {
     }
 };
 
+/**
+ * GET MY FOURNISSEUR PROFILE
+ */
+exports.getMyProfile = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            return res.status(401).json({
+                message: "Unauthorized - no userId in token"
+            });
+        }
+
+        // check f DB
+        let result = await db.query(
+            `SELECT
+                 id_fournisseur AS "idFournisseur",
+                 user_id AS "userId",
+                 nom,
+                 prenom,
+                 email,
+                 telephone AS phone,
+                 cin,
+                 adresse,
+                 status,
+                 image,
+                 created_at AS "createdAt"
+             FROM fournisseurs
+             WHERE user_id=$1`,
+            [userId]
+        );
+
+        let fournisseur;
+
+        if (result.rows.length === 0) {
+            // fallback values ila ma kaynch f token / DB
+            const nom = req.user.nom || '';
+            const prenom = req.user.prenom || '';
+            const email = req.user.email || '';
+            const phone = req.user.phone || '';
+            const cin = req.user.cin || '';
+
+            const createResult = await db.query(
+                `INSERT INTO fournisseurs (user_id, nom, prenom, email, telephone, cin, status)
+                 VALUES ($1,$2,$3,$4,$5,$6,'VALIDATED')
+                     RETURNING 
+                        id_fournisseur AS "idFournisseur",
+                        user_id AS "userId",
+                        nom,
+                        prenom,
+                        email,
+                        telephone AS phone,
+                        cin,
+                        adresse,
+                        status,
+                        image,
+                        created_at AS "createdAt"`,
+                [userId, nom, prenom, email, phone, cin]
+            );
+
+            fournisseur = createResult.rows[0];
+
+        } else {
+            fournisseur = result.rows[0];
+
+            // ila cin null f DB, update b fallback
+            if (!fournisseur.cin) {
+                const fallbackCin = req.user.cin || `UNKNOWN-${Date.now()}`;
+                const updateResult = await db.query(
+                    `UPDATE fournisseurs SET cin=$1 WHERE user_id=$2 RETURNING cin`,
+                    [fallbackCin, userId]
+                );
+                fournisseur.cin = updateResult.rows[0].cin;
+            }
+        }
+
+        res.json({
+            message: "My fournisseur profile",
+            fournisseur
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            message: "Erreur récupération profil fournisseur",
+            error: error.message
+        });
+    }
+};
+
+/**
+ * UPDATE MY FOURNISSEUR PROFILE
+ */
+
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+
+// Configure multer
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const dir = path.join(__dirname, '../uploads');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        const ext = path.extname(file.originalname);
+        const uniqueName = `fournisseur_${req.user.userId}_${Date.now()}${ext}`;
+        cb(null, uniqueName);
+    }
+});
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 } // max 5MB
+});
+
+exports.uploadImageMiddleware = upload.single('image');
+
+// Update profile
+exports.updateMyProfile = async (req, res) => {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const { nom, prenom, phone, email, cin } = req.body;
+    let imagePath;
+
+    if (req.file) {
+        // user uploadach image → save path normal
+        imagePath = `/uploads/${req.file.filename}`;
+    } else {
+        // ila ma kaynch image → create default image if not exists
+        const defaultImageName = `fournisseur_${userId}_default.png`;
+        const defaultImagePath = path.join(__dirname, '../uploads', defaultImageName);
+
+        // ila file ma kaynch f uploads → create empty/default file
+        if (!fs.existsSync(defaultImagePath)) {
+            const emptyBuffer = Buffer.alloc(0); // simple empty file, wla replace b icon png
+            fs.writeFileSync(defaultImagePath, emptyBuffer);
+        }
+
+        imagePath = `/uploads/${defaultImageName}`;
+    }
+
+    try {
+        const result = await db.query(
+            `UPDATE fournisseurs
+             SET nom = COALESCE($1, nom),
+                 prenom = COALESCE($2, prenom),
+                 telephone = COALESCE($3, telephone),
+                 cin = COALESCE($4, cin),
+                 email = COALESCE($5, email),
+                 image = COALESCE($6, image)
+             WHERE user_id = $7
+             RETURNING 
+                id_fournisseur AS "idFournisseur",
+                user_id AS "userId",
+                nom,
+                prenom,
+                email,
+                telephone AS phone,
+                cin,
+                adresse,
+                status,
+                image,
+                created_at AS "createdAt"`,
+            [nom, prenom, phone, cin, email, imagePath, userId]
+        );
+
+        console.log("REQ FILE =>", req.file);
+        res.json({ message: "Profile updated", fournisseur: result.rows[0] });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error updating profile", error: error.message });
+    }
+};
 
 /**
  * GET FOURNISSEUR BY ID
@@ -68,10 +243,10 @@ exports.create = async (req, res) => {
         const { nom, email, telephone, adresse } = req.body;
 
         const result = await db.query(
-            `INSERT INTO fournisseurs (nom,email,telephone,adresse)
+            `INSERT INTO fournisseurs (nom,email,telephone,cin,adresse)
              VALUES ($1,$2,$3,$4)
              RETURNING *`,
-            [nom, email, telephone, adresse]
+            [nom, email, telephone,cin, adresse]
         );
 
         res.status(201).json({

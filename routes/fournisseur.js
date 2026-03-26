@@ -35,6 +35,24 @@ const hasRole = require("../middleware/hasRole");
  */
 router.get("/fournisseurs", authMiddleware, controller.getAll);
 
+
+/**
+ * @swagger
+ * /fournisseurs/me:
+ *   get:
+ *     summary: Get my fournisseur profile
+ *     description: Retourne le profil du fournisseur connecté ou le crée automatiquement
+ *     tags: [Fournisseurs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profil fournisseur
+ */
+router.get('/fournisseurs/me', authMiddleware, controller.getMyProfile);
+
+
+router.put('/fournisseurs/me', authMiddleware, controller.uploadImageMiddleware, controller.updateMyProfile);
 /**
  * @swagger
  * /api/fournisseurs/{id}:
@@ -89,6 +107,7 @@ router.delete("/fournisseurs/:id", authMiddleware, hasRole("ADMIN"), controller.
  *       - bearerAuth: []
  */
 router.put("/fournisseurs/:id/activer", authMiddleware, hasRole("ADMIN"), controller.activer);
+
 
 /**
  * @swagger
