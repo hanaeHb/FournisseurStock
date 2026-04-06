@@ -64,6 +64,9 @@ router.put('/fournisseurs/me', authMiddleware, controller.uploadImageMiddleware,
  */
 router.get("/fournisseurs/:id", authMiddleware, controller.getById);
 
+router.post("/fournisseurs/specializations", authMiddleware, controller.updateSpecializations);
+
+router.get("/fournisseurs/category/:categoryId", authMiddleware, controller.getFournisseursByCategory);
 /**
  * @swagger
  * /api/fournisseurs:

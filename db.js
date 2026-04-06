@@ -44,13 +44,13 @@ async function connectDatabase() {
     await createTables();
 }
 
-// 3. create tables
 async function createTables() {
+
     const fournisseurTable = `
         CREATE TABLE IF NOT EXISTS fournisseurs (
-            id_fournisseur SERIAL PRIMARY KEY,
-            user_id INTEGER UNIQUE,
-            prenom VARCHAR(100),
+                                                    id_fournisseur SERIAL PRIMARY KEY,
+                                                    user_id INTEGER UNIQUE,
+                                                    prenom VARCHAR(100),
             nom VARCHAR(100) NOT NULL,
             email VARCHAR(150) UNIQUE NOT NULL,
             telephone VARCHAR(20),
@@ -62,8 +62,27 @@ async function createTables() {
             );
     `;
 
-    await db.query(fournisseurTable);
-    console.log("Table fournisseurs ready");
+    const specializationTable = `
+        CREATE TABLE IF NOT EXISTS fournisseur_specializations (
+            id SERIAL PRIMARY KEY,
+            id_fournisseur INTEGER REFERENCES fournisseurs(id_fournisseur) ON DELETE CASCADE,
+            id_category INTEGER NOT NULL,
+            UNIQUE(id_fournisseur, id_category) 
+        );
+    `;
+
+    try {
+
+        await db.query(fournisseurTable);
+        console.log("Table fournisseurs ready ✅");
+
+        await db.query(specializationTable);
+        console.log("Table fournisseur_specializations ready ✅");
+
+
+    } catch (err) {
+        console.error("Error creating tables:", err);
+    }
 }
 
 // 4. EXPORT IMPORTANT

@@ -232,7 +232,66 @@ exports.getById = async (req, res) => {
     }
 };
 
+exports.updateSpecializations = async (req, res) => {
+    const { categoryIds } = req.body;
 
+    const userId = req.user.userId || req.user.id || req.user.sub;
+
+    console.log("--- DEBUG ---");
+    console.log("User ID from Token:", userId);
+
+    if (!userId) {
+        return res.status(401).json({ message: "Utilisateur non identifié dans le token" });
+    }
+
+    try {
+        const fResult = await db.query("SELECT id_fournisseur FROM fournisseurs WHERE user_id = $1", [userId]);
+
+        if (fResult.rowCount === 0) {
+            console.error(" Aucun fournisseur trouvé pour user_id:", userId);
+            return res.status(404).json({ message: "Fournisseur non trouvé. Vérifiez votre profil." });
+        }
+
+        const id_fournisseur = fResult.rows[0].id_fournisseur;
+
+        await db.query("DELETE FROM fournisseur_specializations WHERE id_fournisseur = $1", [id_fournisseur]);
+
+        if (categoryIds && categoryIds.length > 0) {
+            const insertQueries = categoryIds.map(catId => {
+                return db.query(
+                    "INSERT INTO fournisseur_specializations (id_fournisseur, id_category) VALUES ($1, $2)",
+                    [id_fournisseur, catId]
+                );
+            });
+            await Promise.all(insertQueries);
+        }
+
+        res.status(200).json({ message: "Spécialisations mises à jour ✅" });
+    } catch (err) {
+        console.error("DATABASE ERROR:", err.message);
+        res.status(500).json({ message: "Erreur serveur", error: err.message });
+    }
+};
+
+exports.getFournisseursByCategory = async (req, res) => {
+    const { categoryId } = req.params;
+    console.log("category:", categoryId);
+
+    try {
+        const query = `
+            SELECT f.* FROM fournisseurs f
+                                JOIN fournisseur_specializations fs ON f.id_fournisseur = fs.id_fournisseur
+            WHERE fs.id_category = $1
+        `;
+
+        const result = await db.query(query, [categoryId]);
+        console.log("fournisseurs:", result.rowCount);
+        res.status(200).json(result.rows);
+    } catch (err) {
+        console.error("error:", err.message);
+        res.status(500).json({ message: "Erreur serveur" });
+    }
+};
 /**
  * CREATE FOURNISSEUR
  */
